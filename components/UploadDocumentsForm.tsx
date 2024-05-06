@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import DEFAULT_RETRIEVAL_TEXT from "@/data/DefaultRetrievalText";
 
 export function UploadDocumentsForm() {
+  const defaultText = "Paste your text here before uploading...";
   const [isLoading, setIsLoading] = useState(false);
-  const [document, setDocument] = useState(DEFAULT_RETRIEVAL_TEXT);
+  const [document, setDocument] = useState(defaultText);
+
   const ingest = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (document.includes("Uploaded!") || document.includes(defaultText)) {
+      return;
+    }
     setIsLoading(true);
     const response = await fetch("/api/retrieval/ingest", {
       method: "POST",
@@ -40,7 +44,7 @@ export function UploadDocumentsForm() {
         </svg>
         <span className="sr-only">Loading...</span>
       </div>
-      <span className={isLoading ? "hidden" : ""}>Upload</span>
+      <span className={isLoading ? "hidden" : ""}>Upload Content</span>
     </button>
   </form>
   );

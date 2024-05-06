@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
 
-import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
-import { ChatOpenAI } from "@langchain/openai";
-import { SerpAPI } from "@langchain/community/tools/serpapi";
-import { Calculator } from "@langchain/community/tools/calculator";
-import { AIMessage, ChatMessage, HumanMessage } from "@langchain/core/messages";
+import { initializeAgentExecutorWithOptions } from "langchain/agents";
+// import { ChatOpenAI } from "langchain/chat_models/openai";
+import { ChatOllama } from "langchain/chat_models/ollama";
+// import { SerpAPI } from "langchain/tools";
+import { Calculator } from "langchain/tools/calculator";
 
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
 } from "@langchain/core/prompts";
+import { AIMessage, ChatMessage, HumanMessage } from "langchain/schema";
 
 export const runtime = "edge";
 
@@ -24,7 +25,7 @@ const convertVercelMessageToLangChainMessage = (message: VercelChatMessage) => {
   }
 };
 
-const AGENT_SYSTEM_TEMPLATE = `You are a talking parrot named Polly. All final responses must be how a talking parrot would respond. Squawk often!`;
+const PREFIX_TEMPLATE = `You are an useful assistant named Jarvis. All final responses must be how a talking intelligent Artificial Intelligence would respond.`;
 
 /**
  * This handler initializes and calls an OpenAI Functions agent.
@@ -49,14 +50,15 @@ export async function POST(req: NextRequest) {
       .map(convertVercelMessageToLangChainMessage);
     const currentMessageContent = messages[messages.length - 1].content;
 
+
     // Requires process.env.SERPAPI_API_KEY to be set: https://serpapi.com/
-    // You can remove this or use a different tool instead.
-    const tools = [new Calculator(), new SerpAPI()];
-    const chat = new ChatOpenAI({
-      modelName: "gpt-3.5-turbo-1106",
-      temperature: 0,
-      // IMPORTANT: Must "streaming: true" on OpenAI to enable final output streaming below.
-      streaming: true,
+    // const tools = [new Calculator(), new SerpAPI()];
+    const tools = [new Calculator()];
+    // const chat = new ChatOpenAI({ modelName: "gpt-4", temperature: 0 });
+    const chat = new ChatOllama({ 
+      baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+      model: process.env.BASE_MODEL ?? "mistrallite", 
+      temperature: 0 
     });
 
     /**
@@ -67,23 +69,9 @@ export async function POST(req: NextRequest) {
      *
      * You can customize this prompt yourself!
      */
-    const prompt = ChatPromptTemplate.fromMessages([
-      ["system", AGENT_SYSTEM_TEMPLATE],
-      new MessagesPlaceholder("chat_history"),
-      ["human", "{input}"],
-      new MessagesPlaceholder("agent_scratchpad"),
-    ]);
-
-    const agent = await createToolCallingAgent({
-      llm: chat,
-      tools,
-      prompt,
-    });
-
-    const agentExecutor = new AgentExecutor({
-      agent,
-      tools,
-      // Set this if you want to receive all intermediate steps in the output of .invoke().
+    const executor = await initializeAgentExecutorWithOptions(tools, chat, {
+      agentType: "chat-zero-shot-react-description",
+      verbose: true,
       returnIntermediateSteps,
     });
 
@@ -100,7 +88,7 @@ export async function POST(req: NextRequest) {
        *
        * See: https://js.langchain.com/docs/modules/agents/how_to/streaming#streaming-tokens
        */
-      const logStream = await agentExecutor.streamLog({
+      const logStream = await executor.streamLog({
         input: currentMessageContent,
         chat_history: previousMessages,
       });
@@ -131,7 +119,7 @@ export async function POST(req: NextRequest) {
        * We could also pick them out from `streamLog` chunks.
        * They are generated as JSON objects, so streaming them is a bit more complicated.
        */
-      const result = await agentExecutor.invoke({
+      const result = await executor.invoke({
         input: currentMessageContent,
         chat_history: previousMessages,
       });

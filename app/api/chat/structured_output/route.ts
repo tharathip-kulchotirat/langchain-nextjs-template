@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-import { ChatOpenAI } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
+import { ChatOllama } from "langchain/chat_models/ollama";
+import { PromptTemplate } from "langchain/prompts";
 import { JsonOutputFunctionsParser } from "langchain/output_parsers";
 
 export const runtime = "edge";
@@ -33,9 +33,10 @@ export async function POST(req: NextRequest) {
     /**
      * Function calling is currently only supported with ChatOpenAI models
      */
-    const model = new ChatOpenAI({
-      temperature: 0.8,
-      modelName: "gpt-3.5-turbo-1106",
+    const model = new ChatOllama({ 
+      baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+      model: process.env.BASE_MODEL ?? "mistrallite", 
+      temperature: 0.3
     });
 
     /**

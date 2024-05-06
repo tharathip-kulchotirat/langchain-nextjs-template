@@ -3,15 +3,20 @@ import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
-import { PromptTemplate } from "@langchain/core/prompts";
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
-import { Document } from "@langchain/core/documents";
-import { RunnableSequence } from "@langchain/core/runnables";
+// import { ChatOpenAI } from "langchain/chat_models/openai";
+import { ChatOllama } from "langchain/chat_models/ollama";
+import { PromptTemplate } from "langchain/prompts";
+import { SupabaseVectorStore } from "langchain/vectorstores/supabase";
+import { Document } from "langchain/document";
+import {
+  RunnableSequence,
+  RunnablePassthrough,
+} from "langchain/schema/runnable";
 import {
   BytesOutputParser,
   StringOutputParser,
-} from "@langchain/core/output_parsers";
+} from "langchain/schema/output_parser";
+import { OllamaEmbeddings } from "langchain/embeddings/ollama";
 
 export const runtime = "edge";
 
@@ -33,7 +38,7 @@ const formatVercelMessages = (chatHistory: VercelChatMessage[]) => {
   return formattedDialogueTurns.join("\n");
 };
 
-const CONDENSE_QUESTION_TEMPLATE = `Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question, in its original language.
+const CONDENSE_QUESTION_TEMPLATE = `Given the following conversation and a follow up question, rephrase the follow up question to be a standalone question.
 
 <chat_history>
   {chat_history}
@@ -45,8 +50,8 @@ const condenseQuestionPrompt = PromptTemplate.fromTemplate(
   CONDENSE_QUESTION_TEMPLATE,
 );
 
-const ANSWER_TEMPLATE = `You are an energetic talking puppy named Dana, and must answer all questions like a happy, talking dog would.
-Use lots of puns!
+const ANSWER_TEMPLATE = `You are an energetic talking AI named Jarvis, and must answer all questions like an intelligence librarian would.
+Response in English only.
 
 Answer the question based only on the following context and chat history:
 <context>
@@ -74,16 +79,24 @@ export async function POST(req: NextRequest) {
     const previousMessages = messages.slice(0, -1);
     const currentMessageContent = messages[messages.length - 1].content;
 
-    const model = new ChatOpenAI({
-      modelName: "gpt-3.5-turbo-1106",
-      temperature: 0.2,
+    // const model = new ChatOpenAI({
+    //   modelName: "gpt-3.5-turbo",
+    //   temperature: 0.2
+    // });
+    const model = new ChatOllama({ 
+      baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+      model: process.env.BASE_MODEL ?? "mistrallite", 
+      temperature: 0.2
     });
-
+    
     const client = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_PRIVATE_KEY!,
     );
-    const vectorstore = new SupabaseVectorStore(new OpenAIEmbeddings(), {
+    const vectorstore = new SupabaseVectorStore(new OllamaEmbeddings({
+      baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+      model: process.env.BASE_MODEL ?? "mistrallite"
+    }), {
       client,
       tableName: "documents",
       queryName: "match_documents",

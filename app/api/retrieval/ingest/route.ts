@@ -3,7 +3,7 @@ import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
 
 import { createClient } from "@supabase/supabase-js";
 import { SupabaseVectorStore } from "langchain/vectorstores/supabase";
-import { OpenAIEmbeddings } from "langchain/embeddings/openai";
+import { OllamaEmbeddings } from "langchain/embeddings/ollama";
 
 export const runtime = "edge";
 
@@ -48,7 +48,10 @@ export async function POST(req: NextRequest) {
 
     const vectorstore = await SupabaseVectorStore.fromDocuments(
       splitDocuments,
-      new OpenAIEmbeddings(),
+      new OllamaEmbeddings({
+        baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+        model: process.env.BASE_MODEL ?? "mistrallite"
+      }),
       {
         client,
         tableName: "documents",

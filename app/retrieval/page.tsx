@@ -107,7 +107,7 @@ export default function AgentsPage() {
         'I\'ve got a nose for finding the right documents! Ask, "What is a document loader?"'
       }
       emoji="🐶"
-      titleText="Dana the Document-Retrieving Dog"
+      titleText="Document-Retrieving Jarvis"
     ></ChatWindow>
   );
 }

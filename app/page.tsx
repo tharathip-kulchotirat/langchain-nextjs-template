@@ -71,9 +71,9 @@ export default function Home() {
   return (
     <ChatWindow
       endpoint="api/chat"
-      emoji="🏴‍☠️"
-      titleText="Patchy the Chatty Pirate"
-      placeholder="I'm an LLM pretending to be a pirate! Ask me about the pirate life!"
+      emoji="😬"
+      titleText="JARVIS!"
+      placeholder="I'm a Jarvis, ask me anything!"
       emptyStateComponent={InfoCard}
     ></ChatWindow>
   );

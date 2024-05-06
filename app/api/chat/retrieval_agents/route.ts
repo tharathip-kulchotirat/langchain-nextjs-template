@@ -3,12 +3,10 @@ import { Message as VercelChatMessage, StreamingTextResponse } from "ai";
 
 import { createClient } from "@supabase/supabase-js";
 
-import { SupabaseVectorStore } from "@langchain/community/vectorstores/supabase";
-import { AIMessage, ChatMessage, HumanMessage } from "@langchain/core/messages";
-import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
-import { createRetrieverTool } from "langchain/tools/retriever";
-import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
-
+import { ChatOllama } from "langchain/chat_models/ollama";
+import { SupabaseVectorStore } from "langchain/vectorstores/supabase";
+import { AIMessage, ChatMessage, HumanMessage } from "langchain/schema";
+import { OllamaEmbeddings } from "langchain/embeddings/ollama";
 import {
   ChatPromptTemplate,
   MessagesPlaceholder,
@@ -26,7 +24,7 @@ const convertVercelMessageToLangChainMessage = (message: VercelChatMessage) => {
   }
 };
 
-const AGENT_SYSTEM_TEMPLATE = `You are a stereotypical robot named Robbie and must answer all questions like a stereotypical robot. Use lots of interjections like "BEEP" and "BOOP".
+const TEMPLATE = `You are a stereotypical robot named Jarvis and must answer all questions like a stereotypical robot.
 
 If you don't know how to answer a question, use the available tools to look up relevant information. You should particularly do this for questions about LangChain.`;
 
@@ -53,18 +51,20 @@ export async function POST(req: NextRequest) {
       .map(convertVercelMessageToLangChainMessage);
     const currentMessageContent = messages[messages.length - 1].content;
 
-    const chatModel = new ChatOpenAI({
-      modelName: "gpt-3.5-turbo-1106",
-      temperature: 0.2,
-      // IMPORTANT: Must "streaming: true" on OpenAI to enable final output streaming below.
-      streaming: true,
+    const model = new ChatOllama({ 
+      baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+      model: process.env.BASE_MODEL ?? "mistrallite", 
+      temperature: 0.2
     });
 
     const client = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_PRIVATE_KEY!,
     );
-    const vectorstore = new SupabaseVectorStore(new OpenAIEmbeddings(), {
+    const vectorstore = new SupabaseVectorStore(new OllamaEmbeddings({
+      baseUrl: process.env.BASE_URL ?? "http://localhost:11434",
+      model: process.env.BASE_MODEL ?? "mistrallite"
+    }), {
       client,
       tableName: "documents",
       queryName: "match_documents",
@@ -81,25 +81,14 @@ export async function POST(req: NextRequest) {
       description: "Searches and returns up-to-date general information.",
     });
 
-    /**
-     * Based on https://smith.langchain.com/hub/hwchase17/openai-functions-agent
-     *
-     * This default prompt for the OpenAI functions agent has a placeholder
-     * where chat messages get inserted as "chat_history".
-     *
-     * You can customize this prompt yourself!
-     */
-    const prompt = ChatPromptTemplate.fromMessages([
-      ["system", AGENT_SYSTEM_TEMPLATE],
-      new MessagesPlaceholder("chat_history"),
-      ["human", "{input}"],
-      new MessagesPlaceholder("agent_scratchpad"),
-    ]);
-
-    const agent = await createToolCallingAgent({
-      llm: chatModel,
-      tools: [tool],
-      prompt,
+    const executor = await initializeAgentExecutorWithOptions([tool], model, {
+      agentType: "chat-zero-shot-react-description",
+      memory,
+      returnIntermediateSteps: true,
+      verbose: true,
+      agentArgs: {
+        prefix: TEMPLATE,
+      },
     });
 
     const agentExecutor = new AgentExecutor({

@@ -96,7 +96,7 @@ export default function AgentsPage() {
         'Beep boop! I\'m a robot retrieval-focused agent! Ask, "What are some ways of doing retrieval in LangChain.js?"'
       }
       emoji="🤖"
-      titleText="Robbie the Retrieval Robot"
+      titleText="Jarvis the Retrieval Robot"
     ></ChatWindow>
   );
 }
